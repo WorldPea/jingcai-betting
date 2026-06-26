@@ -1,25 +1,17 @@
-# 体彩竞彩分析管线（极简版）
+# 竞彩足球分析管线（极简版）
 
-> 本文件是 `jingcai-betting-loop` skill 的内置分析方法论。开工分析时读全文、按五步建 TodoWrite 逐项执行。文中金额/路径为示例，按需调整。**本精简版聚焦"分析出方案"，不含资金管理与台账。**
+> 本文件是 `jingcai-betting-loop` skill 的内置分析方法论。开工分析时读全文、按五步建 TodoWrite 逐项执行。**本工具不抓取任何彩票官网，赔率一律由用户提供（截图或文字）。** 文中金额为示例，按需调整；本精简版聚焦"分析出方案"，不含资金管理与台账。
 
 ## 执行步骤（按序）
 
-### 第1步 拿体彩赔率 — webapi JSON 接口首选
+### 第1步 读取赔率（用户提供的截图或文字）
 
-curl 直取 JSON（无需渲染、省 token）：
+**赔率一律来自用户贴进来的内容，不主动抓取任何官网/接口：**
 
-```bash
-curl -H "User-Agent: Mozilla/5.0" -H "Referer: https://m.sporttery.cn/" \
-  -H "Accept: application/json, text/plain, */*" -H "Origin: https://m.sporttery.cn" \
-  --noproxy '*' \
-  "https://webapi.sporttery.cn/gateway/jc/football/getMatchCalculatorV1.qry?poolCode=hhgg&channel=c"
-```
-
-`poolCode=hhgg`（混合过关）一次返回全部玩法。结构：`value.matchInfoList[]` 按 `matchDateStr` 分段（=北京日期）；玩法字段 `had{h,d,a}`=胜平负、`hhad{goalLine,h,d,a}`=让球、比分/总进球/半全场同理。**停售时段** hhgg 仅返 `vtoolsConfig`，改用单玩法池 `had/hhad/crs` **分别请求**（结构为 `subMatchList[]`、字段 `homeTeamAbbName/awayTeamAbbName`，需按 `matchNumStr` 合并）。偶发空响应重试 2-3 次。
-
-- 后备：Chrome 渲染 `m.sporttery.cn/mjc/jsq/` 各玩法页（比分 `zqbf/`、总进球 `zqzjq/` 等）
-- 用户发截图：直接读图，底部被截断的冷门比分用 ~700 占位（影响 <0.5%）
-- ⚠️ **编号≠北京日期**：场次"周X00N"的周X是赛事编号日（约等于比赛地当地日），北京开赛=编号日+1 凌晨/上午；报场次**必带北京时间开赛时刻**
+- **赔率截图**：直接读图，识别各玩法赔率（胜平负/让球/大小/比分波胆/总进球/半全场等）。底部被截断的冷门比分用 ~700 占位（影响 <0.5%）。
+- **赔率文字**：用户粘贴的盘口/赔率表，逐项解析为「玩法 → 各选项赔率」。
+- **信息不全显式声明**：只给了独赢没给波胆 → 告知缺哪些、本场能做到什么程度，**绝不臆造赔率**。
+- ⚠️ **务必同时拿到开赛时间**（赔率随临场变动，时点关键）；多场则逐场记下队名 + 北京时间开赛时刻，照用户给的为准。
 
 ### 第2步 去水算公平概率
 
@@ -42,10 +34,10 @@ curl "https://api.the-odds-api.com/v4/sports/soccer_fifa_world_cup/odds/?apiKey=
 
 **b) 双方法去水保守取值**：同组国际赔率分别跑按比例法和 power 法（二分求 k 使 Σp^k=1），**EV 取两法较低者**（防冷门偏差陷阱）。
 
-**c) 时点对齐**：体彩用固定奖金页实时价，与国际报价时间差 ≤1h。**临场盘几分钟就移动，每次出方案重拉最新盘**，旧 λ 仅远期未变盘时复用且须声明。
+**c) 时点对齐**：以**用户提供的最新赔率**为准，与国际报价时间差 ≤1h。临场盘几分钟就移动，薄边际易被时点噪声吃掉——必要时让用户补一张最新赔率截图再定。
 
 **d) 比分级泊松反推交叉验证**（找盘口间不自洽，**非正 EV 来源**）：
-- 输入用真金基准让球主盘线 L_让 与大小主盘线 L_大（主盘=两边赔率最接近 1.9 那条；**禁用体彩高水赔率**）
+- 输入用真金基准让球主盘线 L_让 与大小主盘线 L_大（主盘=两边赔率最接近 1.9 那条；**禁用高水彩票赔率**，其 12.9%~40% 高水会污染 λ）
 - 反推：H=(L_大+L_让)/2、A=(L_大−L_让)/2（让球以"主队让为正"取号）
 - 泊松还原 `P(h,a)=Pois(H,h)·Pois(A,a)`，聚合回 1X2/让球/总进球/比分
 - Dixon-Coles τ 修正低分平局（抬高 0:0/1:1、压低 1:0/0:1，ρ≈0.10）
@@ -53,18 +45,17 @@ curl "https://api.the-odds-api.com/v4/sports/soccer_fifa_world_cup/odds/?apiKey=
 - ⚠️ 冷门/低频比分的绝对正 EV 几乎都是模型噪声 + favourite-longshot bias，**只信同方向比分间的相对排序**，绝不照搬绝对 EV 追冷门比分
 - **λ 可信度降级链**：高（≥2 源 Δ<0.2）/ 中（1 源直接亚盘 或 2 源三向拟合）/ 低（单源）。低可信场次标注"λ 仅供参考"、降权或跳过
 
-### 第4步 情报校验（四来源）
+### 第4步 情报校验（公开信息源）
 
-- **a) 官方"析"页**（Chrome 渲染 `sporttery.cn/jc/zqdz/index.html?showType=2&mid=<mid>`）：伤停一览、未来赛事（轮换/动机）、近况含半场比分
-- **b) 官方"固定奖金"页**（`showType=3`）：赔率变动时间序列＝资金流向（某方向持续上调=被看衰）；取最后一行做实时核对
-- **c) WebSearch** `"队名 team news predicted lineup injuries"`：预测首发 + Opta 概率
-- **d) xG 攻防强度交叉**（Opta/Understat）：与市场反推 λ 背离即错价/情报点；仅作交叉验证、不替代市场 λ
+- **a) WebSearch** `"队名 team news predicted lineup injuries"`：预测首发、伤停、Opta 概率
+- **b) xG 攻防强度交叉**（Opta / Understat，搜 `"队名 xG expected goals recent form"`）：与市场反推 λ 背离即错价/情报点；仅作交叉验证、不替代市场 λ
+- **c) news CLI**：`sports-skills news fetch_items --query="队名 lineup injury" --limit=5 --sort_by_date=true`（带时间戳，抓最新动态）
 
-⚠️ **公开情报已被盘口定价，不据此逆市场下注**；正确用法只有三处：(a) 比分选号判断、(b) 首发公布后 1-2h 体彩滞后窗口、(c) 轮换/稳腿风险标注。小组赛末轮额外查**出线形势/动机**（已出线大轮换、形势危急搏命、已淘汰摆烂）。
+⚠️ **公开情报已被盘口定价，不据此逆市场下注**；正确用法只有三处：(a) 比分选号判断、(b) 首发公布后 1-2h 体彩盘滞后于国际盘的猎物窗口、(c) 轮换/稳腿风险标注。小组赛末轮额外查**出线形势/动机**（已出线大轮换、形势危急搏命、已淘汰摆烂）。友谊赛/小组赛末轮此步权重最高，赛前 1-2h 确认首发更准。
 
 ### 第5步 出方案
 
-按 `references/format.md`：整十金额、命中概率列、结果分布表、稳健/平衡/博大梯度。**末尾另附"比分推荐"独立板块**（每场主推1+备选2，每注 50 元）。比分推荐选号优先用第 3 步 d) 的泊松反推分布（国际盘真金 λ）排序，优于单看体彩 crs 去水。
+按 `references/format.md`：整十金额、命中概率列、结果分布表、稳健/平衡/博大梯度。**末尾另附"比分推荐"独立板块**（每场主推1+备选2，每注 50 元）。比分推荐选号优先用第 3 步 d) 的泊松反推分布（国际盘真金 λ）排序，优于单看比分盘去水。
 
 ## 关键纪律（出方案前自检）
 
@@ -77,7 +68,7 @@ curl "https://api.the-odds-api.com/v4/sports/soccer_fifa_world_cup/odds/?apiKey=
 
 ## 损耗控制三原则
 
-①无票跳过（负 EV 游戏里不下注就是最优解）＞②能单关不串（省一半损耗，查赛程总表 `u-dan`=可单关）＞③只用低水盘做腿。
+①无票跳过（负 EV 游戏里不下注就是最优解）＞②能单关不串（该玩法支持单关时，省一半串关损耗）＞③只用低水盘做腿。
 
 - **让球语义**：让 N 负 = 让球后主队输（净胜 ≤ N−1 或不胜）
 - 境外低水位平台（Pinnacle 等）**仅作比价基准**，大陆经其投注违法，不推荐不协助
@@ -90,9 +81,7 @@ curl "https://api.the-odds-api.com/v4/sports/soccer_fifa_world_cup/odds/?apiKey=
 
 | 通路 | 用途 | 状态 |
 |---|---|---|
-| webapi.sporttery.cn JSON | 体彩实时赔率 | ✅ 首选，curl 直连需带 UA/Referer/Accept/Origin 头 + `--noproxy '*'` |
 | the-odds-api（需 key） | 多家书商 h2h+spreads+totals 共识 + 反推 λ | ✅ 主通路，`regions=eu,uk,us` 约 48 家，免费 500/月 |
-| chrome-devtools MCP | 体彩页后备、固定奖金页/情报页 | ✅ 用 `evaluate_script` 抽关键数字省 token，勿整页 take_snapshot |
 | WebSearch / WebFetch | 国际赔率、伤停、首发、Opta | ✅ 免费层 λ 数据源（搜"队名 asian handicap over under odds"） |
 | markets CLI | Kalshi+Polymarket 一键匹配 | ✅ `sports-skills markets match_markets --sport=worldcup` |
 | news CLI | 结构化球队情报 | ✅ `sports-skills news fetch_items --query="队名 lineup injury"` |
