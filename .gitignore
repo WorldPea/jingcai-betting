@@ -1,0 +1,12 @@
+# 个人敏感数据 / 运行时状态 —— 绝不提交
+*.key
+.env
+.env.*
+jingcai/
+ledger.md
+reviews/
+logs/
+*.log
+
+# 系统
+.DS_Store

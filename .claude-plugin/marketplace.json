@@ -1,0 +1,32 @@
+{
+  "name": "jingcai-betting",
+  "id": "jingcai-betting",
+  "owner": {
+    "name": "liangwenda"
+  },
+  "metadata": {
+    "description": "竞彩足球投注全流程闭环 skill：赛前分析→投注台账→赛果通知→复盘→优化沉淀",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "jingcai-betting",
+      "source": "./",
+      "description": "中国体彩竞彩足球分析方法论与全流程闭环：多源去水比价、泊松反推、比分串方案、台账与复盘。方法论已内联，开箱即用（需自备 the-odds-api key 与依赖 skill）。",
+      "version": "1.0.0",
+      "author": {
+        "name": "liangwenda"
+      },
+      "keywords": [
+        "betting",
+        "sports",
+        "football",
+        "soccer",
+        "odds",
+        "竞彩",
+        "体彩"
+      ],
+      "category": "workflow"
+    }
+  ]
+}

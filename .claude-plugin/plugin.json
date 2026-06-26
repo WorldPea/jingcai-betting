@@ -1,0 +1,11 @@
+{
+  "name": "jingcai-betting",
+  "description": "竞彩足球投注全流程闭环：赛前多源分析→投注台账→赛果通知→复盘→优化沉淀",
+  "version": "1.0.0",
+  "author": {
+    "name": "liangwenda"
+  },
+  "license": "MIT",
+  "keywords": ["betting", "sports", "football", "odds", "竞彩", "体彩"],
+  "skills": ["./skills/jingcai-betting-loop"]
+}
