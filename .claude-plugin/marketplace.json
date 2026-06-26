@@ -5,14 +5,14 @@
     "name": "liangwenda"
   },
   "metadata": {
-    "description": "竞彩足球投注全流程闭环 skill：赛前分析→投注台账→赛果通知→复盘→优化沉淀",
+    "description": "竞彩足球赛前分析 skill（极简版）：多源去水比价、泊松反推、出方案与比分串",
     "version": "1.0.0"
   },
   "plugins": [
     {
       "name": "jingcai-betting",
       "source": "./",
-      "description": "中国体彩竞彩足球分析方法论与全流程闭环：多源去水比价、泊松反推、比分串方案、台账与复盘。方法论已内联，开箱即用（需自备 the-odds-api key 与依赖 skill）。",
+      "description": "中国体彩竞彩足球赛前分析方法论（极简版）：多源去水比价、泊松反推、比分串方案。纯分析、不含台账/赛果通知。方法论已内联，需自备 the-odds-api key 与依赖 skill。",
       "version": "1.0.0",
       "author": {
         "name": "liangwenda"
